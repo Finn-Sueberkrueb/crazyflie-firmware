@@ -35,6 +35,36 @@
  * All have a timestamp to be set when the data is calculated.
  */
 
+typedef struct {
+  uint64_t timestamp;
+  uint8_t status;
+  uint16_t motor_1;
+  uint16_t motor_2;
+  uint16_t motor_3;
+  uint16_t motor_4;
+} t_extrenalActuator;
+
+typedef struct {
+  uint64_t timestamp;
+  float pos_x; // m
+  float pos_y; // m
+  float pos_z; // m
+  float vel_x; // m/s
+  float vel_y; // m/s
+  float vel_z; // m/s
+  //float q_1;
+  //float q_2;
+  //float q_3;
+  //float q_4;
+  float rot_x; // deg
+  float rot_y; // deg
+  float rot_z; // deg
+  float rot_vel_x; // deg/s
+  float rot_vel_y; // deg/s
+  float rot_vel_z; // deg/s
+} t_externalState;
+
+
 /** Attitude in euler angle form */
 typedef struct attitude_s {
   uint32_t timestamp;  // Timestamp when the data was computed
