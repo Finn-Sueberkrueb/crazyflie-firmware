@@ -100,7 +100,7 @@ static SemaphoreHandle_t spiMutex;
 static void spiDMAInit();
 static void spiConfigureWithSpeed(uint16_t baudRatePrescaler);
 static void spiDMAInitSlave();
-static void spiConfigureWithSpeedSlave(uint16_t baudRatePrescaler);
+static void spiConfigureWithSpeedSlave();
 
 void spiBegin(void)
 {
@@ -208,7 +208,7 @@ void spiBeginSlave(void)
   spiDMAInitSlave();
 
   /*!< SPI configuration */
-  spiConfigureWithSpeedSlave(SPI_BAUDRATE_2MHZ);
+  spiConfigureWithSpeedSlave();
 
   isInit = true;
 }
@@ -290,7 +290,6 @@ static void spiDMAInitSlave()
   DMA_Init(SPI_RX_DMA_STREAM_SLAVE, &DMA_InitStructure);
 
   // Configure interrupts
-  // TODO: Finn maybe even NVIC_VERY_HIGH_PRI ???
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_HIGH_PRI;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
@@ -326,8 +325,7 @@ static void spiConfigureWithSpeed(uint16_t baudRatePrescaler)
   SPI_Init(SPI, &SPI_InitStructure);
 }
 
-// TODO: Finn optimize SPI settings for speed
-static void spiConfigureWithSpeedSlave(uint16_t baudRatePrescaler)
+static void spiConfigureWithSpeedSlave()
 {
   SPI_InitTypeDef  SPI_InitStructure;
 
@@ -336,13 +334,13 @@ static void spiConfigureWithSpeedSlave(uint16_t baudRatePrescaler)
   SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
   SPI_InitStructure.SPI_Mode = SPI_Mode_Slave;
   SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-  SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
-  SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
+  SPI_InitStructure.SPI_CPOL = SPI_CPOL_High; //SPI_CPOL_Low;
+  SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge; //SPI_CPHA_1Edge;
   SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
   SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
   SPI_InitStructure.SPI_CRCPolynomial = 0; // Not used
 
-  SPI_InitStructure.SPI_BaudRatePrescaler = baudRatePrescaler;
+  //SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BAUDRATE_2MHZ; // The slave clock does not need to be set.
   SPI_Init(SPI, &SPI_InitStructure);
 }
 
@@ -434,10 +432,10 @@ void spiBeginTransaction(uint16_t baudRatePrescaler)
   spiConfigureWithSpeed(baudRatePrescaler);
 }
 
-void spiBeginTransactionSlave(uint16_t baudRatePrescaler)
+void spiBeginTransactionSlave()
 {
   xSemaphoreTake(spiMutex, portMAX_DELAY);
-  spiConfigureWithSpeedSlave(baudRatePrescaler);
+  spiConfigureWithSpeedSlave();
 }
 
 void spiEndTransaction()

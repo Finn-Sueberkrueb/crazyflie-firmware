@@ -43,7 +43,7 @@
 void spiBegin(void);
 void spiBeginSlave(void);
 void spiBeginTransaction(uint16_t baudRatePrescaler);
-void spiBeginTransactionSlave(uint16_t baudRatePrescaler);
+void spiBeginTransactionSlave();
 void spiEndTransaction();
 void spiEndTransactionSlave();
 
