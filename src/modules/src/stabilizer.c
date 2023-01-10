@@ -30,6 +30,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+// TODO: FINN remove delay Libary for Latency here
+//#include "sleepus.h"
+
 #include "system.h"
 #include "log.h"
 #include "param.h"
@@ -127,6 +130,8 @@ static void calcSensorToOutputLatency(const sensorData_t *sensorData)
 {
   uint64_t outTimestamp = usecTimestamp();
   inToOutLatency = outTimestamp - sensorData->interruptTimestamp;
+  //TODO: FINN remove Latency print here
+  //DEBUG_PRINT("inToOutLatency (%lu)\n", inToOutLatency);
 }
 
 static void compressState()
@@ -297,6 +302,9 @@ static void stabilizerTask(void* param)
 
       checkEmergencyStopTimeout();
 
+      // TODO: FINN remove latency sleep timer here. It was used to test how long the delay can be for the internal controller
+      // sleepus(100);
+
       //
       // The supervisor module keeps track of Crazyflie state such as if
       // we are ok to fly, or if the Crazyflie is in flight.
@@ -306,10 +314,13 @@ static void stabilizerTask(void* param)
       if (emergencyStop || (systemIsArmed() == false)) {
         motorsStop();
       } else {
-        powerDistribution(&control, &motorThrustUncapped);
-        batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
-        powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
-        setMotorRatios(&motorPwm);
+        if (externalControlActive() == false){
+          // do not output PWM if external control is active
+          powerDistribution(&control, &motorThrustUncapped);
+          batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
+          powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
+          setMotorRatios(&motorPwm);
+        }
       }
 
 #ifdef CONFIG_DECK_USD
@@ -336,6 +347,66 @@ static void stabilizerTask(void* param)
 #endif
   }
 }
+
+
+// Output PWM to motors if external control is active
+void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4)
+{
+  motorThrustUncapped.motors.m1 = motor_1;
+  motorThrustUncapped.motors.m2 = motor_2;
+  motorThrustUncapped.motors.m3 = motor_3;
+  motorThrustUncapped.motors.m4 = motor_4;
+
+  batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
+  powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
+  setMotorRatios(&motorPwm);
+}
+
+// collect all inforation for external state
+void getCrazyflieState(t_externalState *returnState)
+{
+  returnState->timestamp = sensorData.interruptTimestamp;
+
+  //returnState->status = 0;
+  //returnState->frame = 0;
+  
+  returnState->pos_x = state.position.x;
+  returnState->pos_y = state.position.y;
+  returnState->pos_z = state.position.z;
+
+  returnState->vel_x = state.velocity.x;
+  returnState->vel_y = state.velocity.y;
+  returnState->vel_z = state.velocity.z;
+
+  returnState->acc_x = sensorData.acc.x;
+  returnState->acc_y = sensorData.acc.y;
+  returnState->acc_z = sensorData.acc.z;
+
+  //returnState->q_1 = state.attitudeQuaternion.w;
+  //returnState->q_2 = state.attitudeQuaternion.x;
+  //returnState->q_3 = state.attitudeQuaternion.y;
+  //returnState->q_4 = state.attitudeQuaternion.z;
+  returnState->rot_x = state.attitude.roll;
+  returnState->rot_y = state.attitude.pitch;
+  returnState->rot_z = state.attitude.yaw;
+
+  returnState->rot_vel_x = sensorData.gyro.x;
+  returnState->rot_vel_y = sensorData.gyro.y;
+  returnState->rot_vel_z = sensorData.gyro.z;
+
+  //returnState->rot_acc_x = // float deg/ss
+  //returnState->rot_acc_y = // float deg/ss 
+  //returnState->rot_acc_z = // float deg/ss 
+
+  returnState->motor_1 = motorThrustUncapped.motors.m1;
+  returnState->motor_2 = motorThrustUncapped.motors.m2;
+  returnState->motor_3 = motorThrustUncapped.motors.m3;
+  returnState->motor_4 = motorThrustUncapped.motors.m4;
+
+  //returnState->lased_actuator_frame = 0; //uint16_t
+  //returnState->latency = 0; //float
+}
+
 
 void stabilizerSetEmergencyStop()
 {

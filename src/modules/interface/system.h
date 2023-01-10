@@ -40,7 +40,10 @@ void systemStart();
 void systemWaitStart(void);
 void systemSetArmed(bool val);
 bool systemIsArmed();
-
+void systemSetExternalControl(bool val);
+bool externalControlActive();
+// TODO: define extarnal controll timeout
+#define EXTERNAL_CONTROLL_TIMEOUT 200000 // in usec. 20000 usec = 20ms
 void systemRequestShutdown();
 void systemRequestNRFVersion();
 void systemSyslinkReceive();

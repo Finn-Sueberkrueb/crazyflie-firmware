@@ -85,6 +85,8 @@
 /* Private variable */
 static bool selftestPassed;
 static bool armed = ARM_INIT;
+static bool externalControl = false;
+static uint64_t externalControlLastTimestamp = 0;
 static bool forceArm;
 static uint8_t dumpAssertInfo = 0;
 static bool isInit;
@@ -351,6 +353,27 @@ bool systemIsArmed()
 {
 
   return armed || forceArm;
+}
+
+// system uses a External controll value.
+// Here also a safty shutdown could be included
+void systemSetExternalControl(bool val)
+{
+  externalControlLastTimestamp = usecTimestamp();
+  externalControl = val;
+}
+
+bool externalControlActive()
+{
+  // if last update is not more than EXTERNAL_CONTROLL_TIMEOUT ago, return externalControlState
+  if ((externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) >= usecTimestamp())
+  {
+    return externalControl;
+  }
+  else
+  {
+    return false;
+  }
 }
 
 void systemRequestShutdown()

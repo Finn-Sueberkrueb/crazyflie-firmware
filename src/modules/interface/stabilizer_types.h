@@ -35,15 +35,22 @@
  * All have a timestamp to be set when the data is calculated.
  */
 
+// TODO: avoid Structure Padding. The struct is send without Padding. During the cast the struct needs to be converted correctly for better Performence.
+#pragma pack(push,1)
 typedef struct {
   uint64_t timestamp;
-  uint8_t status;
   uint16_t motor_1;
   uint16_t motor_2;
   uint16_t motor_3;
   uint16_t motor_4;
+  uint16_t frame;
+  uint8_t status;
+  //uint8_t empty1; // Padding
+
 } t_extrenalActuator;
 
+
+// 101 byte ???
 typedef struct {
   uint64_t timestamp;
   float pos_x; // m
@@ -52,7 +59,10 @@ typedef struct {
   float vel_x; // m/s
   float vel_y; // m/s
   float vel_z; // m/s
-  //float q_1;
+  float acc_x; // m/ss
+  float acc_y; // m/ss
+  float acc_z; // m/ss
+  float q_1;
   //float q_2;
   //float q_3;
   //float q_4;
@@ -62,8 +72,23 @@ typedef struct {
   float rot_vel_x; // deg/s
   float rot_vel_y; // deg/s
   float rot_vel_z; // deg/s
+  float rot_acc_x; // deg/ss
+  float rot_acc_y; // deg/ss
+  float rot_acc_z; // deg/ss
+  float latency; //from sensor to actuator
+  uint16_t motor_1;
+  uint16_t motor_2;
+  uint16_t motor_3;
+  uint16_t motor_4;
+  uint16_t frame;
+  uint16_t lased_actuator_frame;
+  uint8_t status;
+  //uint8_t empty1; // Padding
+  //uint16_t empty2; // Padding
+  
 } t_externalState;
 
+#pragma pack(pop)
 
 /** Attitude in euler angle form */
 typedef struct attitude_s {
