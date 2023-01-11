@@ -115,9 +115,7 @@ void appMain() {
     //spiExchangeSlave(BUFFER_SIZE, (uint8_t *)(sendStatePtr), (uint8_t *)(reciveActionPtr));
     //DEBUG_PRINT("recived 0-7: %d %d %d %d %d %d %d\n", spiRxBuffer[0], spiRxBuffer[8], spiRxBuffer[9], spiRxBuffer[10], spiRxBuffer[11], spiRxBuffer[12], spiRxBuffer[13]);
 
-    t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBuffer);
-
-    //reciveActionPtr->timestamp = 
+    t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBuffer + 0);
 
     // TODO: this bit is somehow transmittet in the SPI connection to much.
 
@@ -136,7 +134,7 @@ void appMain() {
     if(reciveActionPtr->status == 1) {
       // 1 = external controll active
       systemSetExternalControl(true);
-      setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4);
+      setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->timestamp, reciveActionPtr->frame);
     } else {
       // external controll inactive
       systemSetExternalControl(false);

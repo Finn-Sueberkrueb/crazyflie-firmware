@@ -365,13 +365,18 @@ void systemSetExternalControl(bool val)
 
 bool externalControlActive()
 {
-  // if last update is not more than EXTERNAL_CONTROLL_TIMEOUT ago, return externalControlState
-  if ((externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) >= usecTimestamp())
-  {
-    return externalControl;
-  }
-  else
-  {
+  if (externalControl){
+    // if last update is not more than EXTERNAL_CONTROLL_TIMEOUT ago, return externalControlState
+    if ((externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) >= usecTimestamp())
+    {
+      //DEBUG_PRINT("remaining: %"PRId64"\n", (externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) - usecTimestamp());
+      return true;
+    } else {
+      DEBUG_PRINT("No current external controll recived! \n");
+      externalControl = false;
+      return false;
+    }
+  } else {
     return false;
   }
 }

@@ -65,6 +65,9 @@ static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
 
 static uint32_t inToOutLatency;
+static uint32_t LastExternalLatency;
+static uint16_t LastActuatorFrame;
+static uint16_t SendFrameCounter = 0;
 
 // State variables for the stabilizer
 static setpoint_t setpoint;
@@ -302,24 +305,21 @@ static void stabilizerTask(void* param)
 
       checkEmergencyStopTimeout();
 
-      // TODO: FINN remove latency sleep timer here. It was used to test how long the delay can be for the internal controller
-      // sleepus(100);
-
       //
       // The supervisor module keeps track of Crazyflie state such as if
       // we are ok to fly, or if the Crazyflie is in flight.
       //
       supervisorUpdate(&sensorData);
 
-      if (emergencyStop || (systemIsArmed() == false)) {
-        motorsStop();
-      } else {
-        if (externalControlActive() == false){
-          // do not output PWM if external control is active
-          powerDistribution(&control, &motorThrustUncapped);
-          batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
-          powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
-          setMotorRatios(&motorPwm);
+      if (externalControlActive() == false){
+        if (emergencyStop || (systemIsArmed() == false)) {
+          motorsStop();
+        } else {
+            // do not output PWM if external control is active
+            powerDistribution(&control, &motorThrustUncapped);
+            batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
+            powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
+            setMotorRatios(&motorPwm); 
         }
       }
 
@@ -350,7 +350,7 @@ static void stabilizerTask(void* param)
 
 
 // Output PWM to motors if external control is active
-void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4)
+void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint64_t sensorDataTimestamp, uint32_t actuatorFrame)
 {
   motorThrustUncapped.motors.m1 = motor_1;
   motorThrustUncapped.motors.m2 = motor_2;
@@ -360,6 +360,11 @@ void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t
   batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
   powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
   setMotorRatios(&motorPwm);
+
+  uint64_t outTimestamp = usecTimestamp();
+  LastExternalLatency = outTimestamp - sensorDataTimestamp;
+
+  LastActuatorFrame = actuatorFrame;
 }
 
 // collect all inforation for external state
@@ -367,8 +372,9 @@ void getCrazyflieState(t_externalState *returnState)
 {
   returnState->timestamp = sensorData.interruptTimestamp;
 
-  //returnState->status = 0;
-  //returnState->frame = 0;
+  returnState->status = 0; // TODO: 
+  SendFrameCounter ++;
+  returnState->frame = SendFrameCounter;
   
   returnState->pos_x = state.position.x;
   returnState->pos_y = state.position.y;
@@ -382,7 +388,7 @@ void getCrazyflieState(t_externalState *returnState)
   returnState->acc_y = sensorData.acc.y;
   returnState->acc_z = sensorData.acc.z;
 
-  //returnState->q_1 = state.attitudeQuaternion.w;
+  returnState->q_1 = state.attitudeQuaternion.w; // TODO
   //returnState->q_2 = state.attitudeQuaternion.x;
   //returnState->q_3 = state.attitudeQuaternion.y;
   //returnState->q_4 = state.attitudeQuaternion.z;
@@ -394,17 +400,17 @@ void getCrazyflieState(t_externalState *returnState)
   returnState->rot_vel_y = sensorData.gyro.y;
   returnState->rot_vel_z = sensorData.gyro.z;
 
-  //returnState->rot_acc_x = // float deg/ss
-  //returnState->rot_acc_y = // float deg/ss 
-  //returnState->rot_acc_z = // float deg/ss 
+  returnState->rot_acc_x = 0.0; //TODO: // float deg/ss
+  returnState->rot_acc_y = 0.0; //TODO: // float deg/ss 
+  returnState->rot_acc_z = 0.0; //TODO: // float deg/ss 
 
   returnState->motor_1 = motorThrustUncapped.motors.m1;
   returnState->motor_2 = motorThrustUncapped.motors.m2;
   returnState->motor_3 = motorThrustUncapped.motors.m3;
   returnState->motor_4 = motorThrustUncapped.motors.m4;
 
-  //returnState->lased_actuator_frame = 0; //uint16_t
-  //returnState->latency = 0; //float
+  returnState->lased_actuator_frame = LastActuatorFrame; //uint16_t
+  returnState->latency = LastExternalLatency; //float
 }
 
 

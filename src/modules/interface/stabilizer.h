@@ -65,7 +65,7 @@ void stabilizerResetEmergencyStop();
 void stabilizerSetEmergencyStopTimeout(int timeout);
 
 
-void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4);
+void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint64_t sensorDataTimestamp, uint32_t actuatorFrame);
 void getCrazyflieState(t_externalState *returnState);
 
 
