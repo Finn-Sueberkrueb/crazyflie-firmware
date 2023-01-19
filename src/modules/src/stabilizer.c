@@ -350,7 +350,7 @@ static void stabilizerTask(void* param)
 
 
 // Output PWM to motors if external control is active
-void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint64_t sensorDataTimestamp, uint32_t actuatorFrame)
+void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint32_t actuatorFrame)
 {
   motorThrustUncapped.motors.m1 = motor_1;
   motorThrustUncapped.motors.m2 = motor_2;
@@ -361,18 +361,25 @@ void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t
   powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
   setMotorRatios(&motorPwm);
 
+  LastActuatorFrame = actuatorFrame;
+}
+
+uint64_t CalculateExternalLatency(uint64_t sensorDataTimestamp){
   uint64_t outTimestamp = usecTimestamp();
   LastExternalLatency = outTimestamp - sensorDataTimestamp;
-
-  LastActuatorFrame = actuatorFrame;
+  return LastExternalLatency;
 }
 
 // collect all inforation for external state
 void getCrazyflieState(t_externalState *returnState)
 {
   returnState->timestamp = sensorData.interruptTimestamp;
-
-  returnState->status = 0; // TODO: 
+  
+  if (externalControlActive()){
+    returnState->status = 1;
+  } else {
+    returnState->status = 0;
+  }
   SendFrameCounter ++;
   returnState->frame = SendFrameCounter;
   

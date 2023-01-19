@@ -37,6 +37,11 @@
 #include "config.h"
 #include "nvicconf.h"
 
+// TODO: remove this
+#define DEBUG_MODULE "Flyonic"
+#include "debug.h"
+
+
 #define SPI                     SPI1
 #define SPI_CLK                 RCC_APB2Periph_SPI1
 #define SPI_CLK_INIT            RCC_APB2PeriphClockCmd
@@ -95,6 +100,8 @@ static bool isInit = false;
 
 static SemaphoreHandle_t txComplete;
 static SemaphoreHandle_t rxComplete;
+static SemaphoreHandle_t txCompleteSlave;
+static SemaphoreHandle_t rxCompleteSlave;
 static SemaphoreHandle_t spiMutex;
 
 static void spiDMAInit();
@@ -166,8 +173,8 @@ void spiBeginSlave(void)
 
   // binary semaphores created using xSemaphoreCreateBinary() are created in a state
   // such that the the semaphore must first be 'given' before it can be 'taken'
-  txComplete = xSemaphoreCreateBinary();
-  rxComplete = xSemaphoreCreateBinary();
+  txCompleteSlave = xSemaphoreCreateBinary();
+  rxCompleteSlave = xSemaphoreCreateBinary();
   spiMutex = xSemaphoreCreateMutex();
 
   /*!< Enable the SPI clock */
@@ -389,7 +396,7 @@ bool spiExchange(size_t length, const uint8_t * data_tx, uint8_t * data_rx)
   return result;
 }
 
-bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx)
+bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx, bool handshake, int timeout)
 {
   // DMA already configured, just need to set memory addresses
   SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
@@ -417,14 +424,104 @@ bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx)
   // Enable peripheral
   SPI_Cmd(SPI, ENABLE);
 
+  if(handshake){
+    digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
+  }
+
   // Wait for completion
-  bool result = (xSemaphoreTake(txComplete, portMAX_DELAY) == pdTRUE)
-             && (xSemaphoreTake(rxComplete, portMAX_DELAY) == pdTRUE);
+  bool result = ((xSemaphoreTake(txCompleteSlave, ( TickType_t )timeout) == pdFALSE)
+             && (xSemaphoreTake(rxCompleteSlave, ( TickType_t )timeout) == pdFALSE));
+
+  if(handshake){
+    digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
+  }
 
   // Disable peripheral
   SPI_Cmd(SPI, DISABLE);
   return result;
 }
+
+
+// timeout in ms
+bool spiReciveSlave(size_t length, uint8_t * data_rx, uint32_t timeout)
+{
+  // TODO: Why is the semaphore sometimes already set at this point?
+  xSemaphoreTake(rxCompleteSlave, 0); // In case the semaphore is still set, we take it.
+
+  // DMA already configured, just need to set memory addresses
+  SPI_RX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_rx;
+  SPI_RX_DMA_STREAM_SLAVE->NDTR = length;
+
+  // Enable SPI DMA Interrupts
+  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
+
+  // Clear DMA Flags
+  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF0|DMA_FLAG_DMEIF0|DMA_FLAG_TEIF0|DMA_FLAG_HTIF0|DMA_FLAG_TCIF0);
+
+  // Enable DMA Streams
+  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,ENABLE);
+
+  // Enable SPI DMA requests
+  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
+
+  // Enable peripheral
+  SPI_Cmd(SPI, ENABLE);
+
+
+  // Wait for completion
+  //bool result = (xSemaphoreTake(rxCompleteSlave, (TickType_t) timeout) == pdTRUE);
+
+  bool result = false;
+  if (xSemaphoreTake(rxCompleteSlave, M2T(timeout)) == pdTRUE){
+    result = true;
+  }
+
+  //bool result = (xSemaphoreTake(rxCompleteSlave, (TickType_t) 1000) == pdTRUE);
+
+  // Disable peripheral
+  SPI_Cmd(SPI, DISABLE);
+  return result;
+}
+
+
+bool spiSendSlave(size_t length, const uint8_t * data_tx)
+{
+  // DMA already configured, just need to set memory addresses
+  SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
+  SPI_TX_DMA_STREAM_SLAVE->NDTR = length;
+
+  // Enable SPI DMA Interrupts
+  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
+
+  // Clear DMA Flags
+  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF5|DMA_FLAG_DMEIF5|DMA_FLAG_TEIF5|DMA_FLAG_HTIF5|DMA_FLAG_TCIF5);
+
+  // Enable DMA Streams
+  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,ENABLE);
+
+  // Enable SPI DMA requests
+  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
+
+  // Enable peripheral
+  SPI_Cmd(SPI, ENABLE);
+
+  digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
+
+  // Wait for completion
+  bool result = (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) == pdTRUE);
+
+  digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
+
+  // Disable peripheral
+  SPI_Cmd(SPI, DISABLE);
+  return result;
+}
+
+
+
+
+
+
 
 void spiBeginTransaction(uint16_t baudRatePrescaler)
 {
@@ -453,20 +550,24 @@ void __attribute__((used)) SPI_TX_DMA_IRQHandler(void)
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
 
   // Stop and cleanup DMA stream
-  DMA_ITConfig(SPI_TX_DMA_STREAM, DMA_IT_TC, DISABLE);
-  DMA_ClearITPendingBit(SPI_TX_DMA_STREAM, SPI_TX_DMA_FLAG_TCIF);
+  //DMA_ITConfig(SPI_TX_DMA_STREAM, DMA_IT_TC, DISABLE);
+  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, DISABLE);
+  //DMA_ClearITPendingBit(SPI_TX_DMA_STREAM, SPI_TX_DMA_FLAG_TCIF);
+  DMA_ClearITPendingBit(SPI_TX_DMA_STREAM_SLAVE, SPI_TX_DMA_FLAG_TCIF_SLAVE);
 
   // Clear stream flags
-  DMA_ClearFlag(SPI_TX_DMA_STREAM,SPI_TX_DMA_FLAG_TCIF);
+  //DMA_ClearFlag(SPI_TX_DMA_STREAM,SPI_TX_DMA_FLAG_TCIF);
+  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE,SPI_TX_DMA_FLAG_TCIF_SLAVE);
 
   // Disable SPI DMA requests
   SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, DISABLE);
 
   // Disable streams
-  DMA_Cmd(SPI_TX_DMA_STREAM,DISABLE);
+  //DMA_Cmd(SPI_TX_DMA_STREAM,DISABLE);
+  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,DISABLE);
 
   // Give the semaphore, allowing the SPI transaction to complete
-  xSemaphoreGiveFromISR(txComplete, &xHigherPriorityTaskWoken);
+  xSemaphoreGiveFromISR(txCompleteSlave, &xHigherPriorityTaskWoken);
 
   if (xHigherPriorityTaskWoken)
   {
@@ -479,20 +580,24 @@ void __attribute__((used)) SPI_RX_DMA_IRQHandler(void)
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
 
   // Stop and cleanup DMA stream
-  DMA_ITConfig(SPI_RX_DMA_STREAM, DMA_IT_TC, DISABLE);
-  DMA_ClearITPendingBit(SPI_RX_DMA_STREAM, SPI_RX_DMA_FLAG_TCIF);
+  //DMA_ITConfig(SPI_RX_DMA_STREAM, DMA_IT_TC, DISABLE);
+  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, DISABLE);
+  //DMA_ClearITPendingBit(SPI_RX_DMA_STREAM, SPI_RX_DMA_FLAG_TCIF);
+  DMA_ClearITPendingBit(SPI_RX_DMA_STREAM_SLAVE, SPI_RX_DMA_FLAG_TCIF_SLAVE);
 
   // Clear stream flags
-  DMA_ClearFlag(SPI_RX_DMA_STREAM,SPI_RX_DMA_FLAG_TCIF);
+  //DMA_ClearFlag(SPI_RX_DMA_STREAM,SPI_RX_DMA_FLAG_TCIF);
+  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE,SPI_RX_DMA_FLAG_TCIF_SLAVE);
 
   // Disable SPI DMA requests
   SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, DISABLE);
 
   // Disable streams
-  DMA_Cmd(SPI_RX_DMA_STREAM,DISABLE);
+  //DMA_Cmd(SPI_RX_DMA_STREAM,DISABLE);
+  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,DISABLE);
 
   // Give the semaphore, allowing the SPI transaction to complete
-  xSemaphoreGiveFromISR(rxComplete, &xHigherPriorityTaskWoken);
+  xSemaphoreGiveFromISR(rxCompleteSlave, &xHigherPriorityTaskWoken);
 
   if (xHigherPriorityTaskWoken)
   {
