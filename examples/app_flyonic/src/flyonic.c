@@ -102,7 +102,7 @@ void appMain() {
     //memset(&spiRxBufferActor, 0x03, sizeof(t_extrenalActuator));
 
     
-    bool result = spiReciveSlave(sizeof(t_extrenalActuator), (uint8_t *)(&spiRxBufferActor), 20);//(10 / portTICK_PERIOD_MS));
+    bool result = spiReciveSlave(sizeof(t_extrenalActuator)+1, (uint8_t *)(&spiRxBufferActor), 20);//(10 / portTICK_PERIOD_MS));
     //uint64_t LastExternalLatency_2 = usecTimestamp() - outTimestamp_2;
 
     //DEBUG_PRINT("latency for wait: %.6f ms sucess = %d , wait %ld \n", LastExternalLatency_2/1000.0, result, (10000 / portTICK_PERIOD_MS));
@@ -168,14 +168,14 @@ void appMain() {
 
       }
 
-      DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
+      //DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
 
       
 
 
 
    } else {
-      DEBUG_PRINT("timeout\n");
+      //DEBUG_PRINT("timeout\n");
       //DEBUG_PRINT("-1\n");
     }
 
