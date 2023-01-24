@@ -442,6 +442,82 @@ bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx,
 }
 
 
+
+
+// first send, than wait for recive with timeout in ms
+bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t length_rx, uint8_t * data_rx, uint32_t timeout)
+{
+  // DMA already configured, just need to set memory addresses
+  SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
+  SPI_TX_DMA_STREAM_SLAVE->NDTR = length_tx;
+  // DMA already configured, just need to set memory addresses
+  SPI_RX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_rx;
+  SPI_RX_DMA_STREAM_SLAVE->NDTR = length_rx;
+
+
+  // Enable SPI DMA Interrupts
+  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
+  // Enable SPI DMA Interrupts
+  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
+
+  // Clear DMA Flags
+  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF5|DMA_FLAG_DMEIF5|DMA_FLAG_TEIF5|DMA_FLAG_HTIF5|DMA_FLAG_TCIF5);
+  // Clear DMA Flags
+  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF0|DMA_FLAG_DMEIF0|DMA_FLAG_TEIF0|DMA_FLAG_HTIF0|DMA_FLAG_TCIF0);
+
+  // Enable DMA Streams
+  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,ENABLE);
+  // Enable DMA Streams
+  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,ENABLE);
+
+  // Enable SPI DMA requests
+  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
+  // Enable SPI DMA requests
+  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
+
+  // Enable peripheral
+  SPI_Cmd(SPI, ENABLE);
+
+  digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
+  // Wait for completion
+  // TODO: bool result_tx = (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) == pdTRUE);
+  xSemaphoreTake(txCompleteSlave, portMAX_DELAY);
+
+  digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
+
+
+
+
+  // TODO: Why is the semaphore sometimes already set at this point?
+  xSemaphoreTake(rxCompleteSlave, 0); // In case the semaphore is still set, we take it.
+  
+  // Wait for rx completion
+  bool result_rx = false;
+  if (xSemaphoreTake(rxCompleteSlave, M2T(timeout)) == pdTRUE){
+    result_rx = true;
+  }
+
+
+
+
+  // Disable peripheral
+  SPI_Cmd(SPI, DISABLE);
+  return result_rx;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // timeout in ms
 bool spiReciveSlave(size_t length, uint8_t * data_rx, uint32_t timeout)
 {

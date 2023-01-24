@@ -54,6 +54,7 @@ bool spiExchange(size_t length, const uint8_t *data_tx, uint8_t *data_rx);
 bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx, bool handshake, int timeout);
 bool spiReciveSlave(size_t length, uint8_t * data_rx, uint32_t timeout);
 bool spiSendSlave(size_t length, const uint8_t * data_tx);
+bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t length_rx, uint8_t * data_rx, uint32_t timeout);
 
 
 #endif /* SPI_H_ */

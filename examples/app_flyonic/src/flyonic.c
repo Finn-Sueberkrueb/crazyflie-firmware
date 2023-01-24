@@ -76,6 +76,9 @@ void appMain() {
   spiBeginTransactionSlave();
 
   uint64_t LastExternalLatency;
+
+  // TODO: define someware with flyonic structs in a seperate header
+  uint32_t DT = 10; // in ms
   
   //DEBUG_PRINT("send buffer size: %d\n", BUFFER_SIZE);
   DEBUG_PRINT("SPI for ESP32 sarted\n");
@@ -86,10 +89,22 @@ void appMain() {
     t_externalState *sendStatePtr = (t_externalState *)((uint8_t*)&spiTxBufferState);
     getCrazyflieState(sendStatePtr);
 
+    //bool result = spiSendThanReciveSlave(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState), sizeof(t_extrenalActuator)+1, (uint8_t *)(&spiRxBufferActor), DT);
+
+
+    // TODO: delete
+    //sendStatePtr->timestamp = usecTimestamp();
+
     //DEBUG_PRINT("spiTxBufferState 0-7: %d %d %d %d %d %d %d %d\n", spiTxBufferState[0], spiTxBufferState[1], spiTxBufferState[2], spiTxBufferState[3], spiTxBufferState[4], spiTxBufferState[5], spiTxBufferState[6], spiTxBufferState[7]);
     spiSendSlave(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState));
 
     //spiExchangeSlave(sizeof(t_externalState), (uint8_t *)(&spiTxBuffer), (uint8_t *)(&spiRxBuffer));
+
+    //DEBUG_PRINT("time to pickup: %.3f ms\n", (usecTimestamp() - sendStatePtr->timestamp)/1000.0);
+    
+
+
+
 
 
 
@@ -102,7 +117,7 @@ void appMain() {
     //memset(&spiRxBufferActor, 0x03, sizeof(t_extrenalActuator));
 
     
-    bool result = spiReciveSlave(sizeof(t_extrenalActuator)+1, (uint8_t *)(&spiRxBufferActor), 20);//(10 / portTICK_PERIOD_MS));
+    bool result = spiReciveSlave(sizeof(t_extrenalActuator)+1, (uint8_t *)(&spiRxBufferActor), DT);
     //uint64_t LastExternalLatency_2 = usecTimestamp() - outTimestamp_2;
 
     //DEBUG_PRINT("latency for wait: %.6f ms sucess = %d , wait %ld \n", LastExternalLatency_2/1000.0, result, (10000 / portTICK_PERIOD_MS));
@@ -111,7 +126,8 @@ void appMain() {
 
     if(result){
     //DEBUG_PRINT("spiRxBufferActor 0-7: %d %d %d %d %d %d %d %d\n", spiRxBufferActor[0], spiRxBufferActor[1], spiRxBufferActor[2], spiRxBufferActor[3], spiRxBufferActor[4], spiRxBufferActor[5], spiRxBufferActor[6], spiRxBufferActor[7]);
-
+    //DEBUG_PRINT("spiRxBufferActor 8-15: %d %d %d %d %d %d %d %d\n", spiRxBufferActor[0+8], spiRxBufferActor[1+8], spiRxBufferActor[2+8], spiRxBufferActor[3+8], spiRxBufferActor[4+8], spiRxBufferActor[5+8], spiRxBufferActor[6+8], spiRxBufferActor[7+8]);
+    //DEBUG_PRINT("spiRxBufferActor 16-23: %d %d %d %d %d %d %d %d\n", spiRxBufferActor[0+16], spiRxBufferActor[1+16], spiRxBufferActor[2+16], spiRxBufferActor[3+16], spiRxBufferActor[4+16], spiRxBufferActor[5+16], spiRxBufferActor[6+16], spiRxBufferActor[7+16]);
     //}
     
     
@@ -140,9 +156,10 @@ void appMain() {
       //spiExchangeSlave(BUFFER_SIZE, (uint8_t *)(sendStatePtr), (uint8_t *)(reciveActionPtr));
       //DEBUG_PRINT("recived 0-7: %d %d %d %d %d %d %d\n", spiRxBuffer[0], spiRxBuffer[8], spiRxBuffer[9], spiRxBuffer[10], spiRxBuffer[11], spiRxBuffer[12], spiRxBuffer[13]);
 
-      t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBufferActor + 1);
-
       // TODO: this bit is somehow transmittet in the SPI connection to much.
+      t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBufferActor + 1);
+      // TODO: t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBufferActor);
+
 
       //DEBUG_PRINT("time: %"PRId64"\n", reciveActionPtr->timestamp);
       //DEBUG_PRINT("status: %d\n", reciveActionPtr->status);
@@ -168,7 +185,11 @@ void appMain() {
 
       }
 
+
+
+      //DEBUG_PRINT("%.3f - %u - %u\n", LastExternalLatency/1000.0, reciveActionPtr->frame, sendStatePtr->frame);
       //DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
+
 
       
 
@@ -180,7 +201,7 @@ void appMain() {
     }
 
 
-    float DT = 10.0;
+    
     float time_to_wait_in_ms = DT - (usecTimestamp() - sendStatePtr->timestamp)/1000;
 
     if(time_to_wait_in_ms < DT){
