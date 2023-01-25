@@ -107,7 +107,7 @@ static SemaphoreHandle_t spiMutex;
 static void spiDMAInit();
 static void spiConfigureWithSpeed(uint16_t baudRatePrescaler);
 static void spiDMAInitSlave();
-static void spiConfigureWithSpeedSlave();
+static void spiConfigureSlave();
 
 void spiBegin(void)
 {
@@ -215,7 +215,7 @@ void spiBeginSlave(void)
   spiDMAInitSlave();
 
   /*!< SPI configuration */
-  spiConfigureWithSpeedSlave();
+  spiConfigureSlave();
 
   isInit = true;
 }
@@ -332,7 +332,7 @@ static void spiConfigureWithSpeed(uint16_t baudRatePrescaler)
   SPI_Init(SPI, &SPI_InitStructure);
 }
 
-static void spiConfigureWithSpeedSlave()
+static void spiConfigureSlave()
 {
   SPI_InitTypeDef  SPI_InitStructure;
 
@@ -472,17 +472,16 @@ bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t le
 
   // Enable SPI DMA requests
   SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
-
+  
   // Enable peripheral
   SPI_Cmd(SPI, ENABLE);
 
   digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
   // Wait for completion
   // TODO: bool result_tx = (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) == pdTRUE);
-  xSemaphoreTake(txCompleteSlave, portMAX_DELAY);
-
+  if (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) != pdTRUE){
+    return false;
+  }
   digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
 
 
@@ -490,13 +489,14 @@ bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t le
 
   // TODO: Why is the semaphore sometimes already set at this point?
   xSemaphoreTake(rxCompleteSlave, 0); // In case the semaphore is still set, we take it.
-  
+
+  // Enable SPI DMA requests
+  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
   // Wait for rx completion
   bool result_rx = false;
   if (xSemaphoreTake(rxCompleteSlave, M2T(timeout)) == pdTRUE){
     result_rx = true;
   }
-
 
 
 
@@ -608,7 +608,7 @@ void spiBeginTransaction(uint16_t baudRatePrescaler)
 void spiBeginTransactionSlave()
 {
   xSemaphoreTake(spiMutex, portMAX_DELAY);
-  spiConfigureWithSpeedSlave();
+  spiConfigureSlave();
 }
 
 void spiEndTransaction()
