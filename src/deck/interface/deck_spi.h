@@ -37,24 +37,14 @@
 #define SPI_BAUDRATE_3MHZ   SPI_BaudRatePrescaler_32    // 2.625MHz
 #define SPI_BAUDRATE_2MHZ   SPI_BaudRatePrescaler_64    // 1.3125MHz
 
-#define GPIO_HANDSHAKE DECK_GPIO_IO1 // TODO: definen here and in flyonic.c
-
 /**
  * Initialize the SPI.
  */
 void spiBegin(void);
-void spiBeginSlave(void);
 void spiBeginTransaction(uint16_t baudRatePrescaler);
-void spiBeginTransactionSlave();
 void spiEndTransaction();
-void spiEndTransactionSlave();
 
 /* Send the data_tx buffer and receive into the data_rx buffer */
 bool spiExchange(size_t length, const uint8_t *data_tx, uint8_t *data_rx);
-bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx, bool handshake, int timeout);
-bool spiReciveSlave(size_t length, uint8_t * data_rx, uint32_t timeout);
-bool spiSendSlave(size_t length, const uint8_t * data_tx);
-bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t length_rx, uint8_t * data_rx, uint32_t timeout);
-
 
 #endif /* SPI_H_ */

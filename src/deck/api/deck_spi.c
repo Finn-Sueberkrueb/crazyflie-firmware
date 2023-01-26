@@ -37,11 +37,6 @@
 #include "config.h"
 #include "nvicconf.h"
 
-// TODO: remove this
-#define DEBUG_MODULE "Flyonic"
-#include "debug.h"
-
-
 #define SPI                     SPI1
 #define SPI_CLK                 RCC_APB2Periph_SPI1
 #define SPI_CLK_INIT            RCC_APB2PeriphClockCmd
@@ -83,16 +78,6 @@
 #define SPI_MOSI_SOURCE         GPIO_PinSource7
 #define SPI_MOSI_AF             GPIO_AF_SPI1
 
-#define SPI_TX_DMA_STREAM_SLAVE       	DMA2_Stream5
-#define SPI_TX_DMA_IRQ_SLAVE          	DMA2_Stream5_IRQn
-#define SPI_TX_DMA_CHANNEL_SLAVE      	DMA_Channel_3
-#define SPI_TX_DMA_FLAG_TCIF_SLAVE    	DMA_FLAG_TCIF5
-
-#define SPI_RX_DMA_STREAM_SLAVE       	DMA2_Stream0
-#define SPI_RX_DMA_IRQ_SLAVE          	DMA2_Stream0_IRQn
-#define SPI_RX_DMA_CHANNEL_SLAVE      	DMA_Channel_3
-#define SPI_RX_DMA_FLAG_TCIF_SLAVE    	DMA_FLAG_TCIF0
-
 
 #define DUMMY_BYTE         0xA5
 
@@ -100,14 +85,11 @@ static bool isInit = false;
 
 static SemaphoreHandle_t txComplete;
 static SemaphoreHandle_t rxComplete;
-static SemaphoreHandle_t txCompleteSlave;
-static SemaphoreHandle_t rxCompleteSlave;
 static SemaphoreHandle_t spiMutex;
 
 static void spiDMAInit();
 static void spiConfigureWithSpeed(uint16_t baudRatePrescaler);
-static void spiDMAInitSlave();
-static void spiConfigureSlave();
+
 
 void spiBegin(void)
 {
@@ -166,60 +148,6 @@ void spiBegin(void)
   isInit = true;
 }
 
-void spiBeginSlave(void)
-{
-
-  GPIO_InitTypeDef GPIO_InitStructure;
-
-  // binary semaphores created using xSemaphoreCreateBinary() are created in a state
-  // such that the the semaphore must first be 'given' before it can be 'taken'
-  txCompleteSlave = xSemaphoreCreateBinary();
-  rxCompleteSlave = xSemaphoreCreateBinary();
-  spiMutex = xSemaphoreCreateMutex();
-
-  /*!< Enable the SPI clock */
-  SPI_CLK_INIT(SPI_CLK, ENABLE);
-
-  /*!< Enable GPIO clocks */
-  RCC_AHB1PeriphClockCmd(SPI_SCK_GPIO_CLK | SPI_MISO_GPIO_CLK |
-                         SPI_MOSI_GPIO_CLK, ENABLE);
-
-  /*!< Enable DMA Clocks */
-  SPI_DMA_CLK_INIT(SPI_DMA_CLK, ENABLE);
-
-  /*!< SPI pins configuration *************************************************/
-
-  /*!< Connect SPI pins to AF5 */
-  GPIO_PinAFConfig(SPI_SCK_GPIO_PORT, SPI_SCK_SOURCE, SPI_SCK_AF);
-  GPIO_PinAFConfig(SPI_MISO_GPIO_PORT, SPI_MISO_SOURCE, SPI_MISO_AF);
-  GPIO_PinAFConfig(SPI_MOSI_GPIO_PORT, SPI_MOSI_SOURCE, SPI_MOSI_AF);
-
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
-
-  /*!< SPI SCK pin configuration */
-  GPIO_InitStructure.GPIO_Pin = SPI_SCK_PIN;
-  GPIO_Init(SPI_SCK_GPIO_PORT, &GPIO_InitStructure);
-
-  /*!< SPI MOSI pin configuration */
-  GPIO_InitStructure.GPIO_Pin =  SPI_MOSI_PIN;
-  GPIO_Init(SPI_MOSI_GPIO_PORT, &GPIO_InitStructure);
-
-  /*!< SPI MISO pin configuration */
-  GPIO_InitStructure.GPIO_Pin =  SPI_MISO_PIN;
-  GPIO_Init(SPI_MISO_GPIO_PORT, &GPIO_InitStructure);
-
-  /*!< SPI DMA Initialization */
-  spiDMAInitSlave();
-
-  /*!< SPI configuration */
-  spiConfigureSlave();
-
-  isInit = true;
-}
-
 static void spiDMAInit()
 {
   DMA_InitTypeDef  DMA_InitStructure;
@@ -264,50 +192,6 @@ static void spiDMAInit()
   NVIC_Init(&NVIC_InitStructure);
 }
 
-static void spiDMAInitSlave()
-{
-  DMA_InitTypeDef  DMA_InitStructure;
-  NVIC_InitTypeDef NVIC_InitStructure;
-
-  /* Configure DMA Initialization Structure */
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable ;
-  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_1QuarterFull ;
-  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single ;
-  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-  DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-  DMA_InitStructure.DMA_PeripheralBaseAddr =(uint32_t) (&(SPI->DR)) ;
-  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_BufferSize = 0; // set later
-  DMA_InitStructure.DMA_Memory0BaseAddr = 0; // set later
-
-  // Configure TX DMA
-  DMA_InitStructure.DMA_Channel = SPI_TX_DMA_CHANNEL_SLAVE;
-  DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,DISABLE);
-  DMA_Init(SPI_TX_DMA_STREAM_SLAVE, &DMA_InitStructure);
-
-  // Configure RX DMA
-  DMA_InitStructure.DMA_Channel = SPI_RX_DMA_CHANNEL_SLAVE;
-  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
-  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,DISABLE);
-  DMA_Init(SPI_RX_DMA_STREAM_SLAVE, &DMA_InitStructure);
-
-  // Configure interrupts
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_HIGH_PRI;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-
-  NVIC_InitStructure.NVIC_IRQChannel = SPI_TX_DMA_IRQ_SLAVE;
-  NVIC_Init(&NVIC_InitStructure);
-
-  NVIC_InitStructure.NVIC_IRQChannel = SPI_RX_DMA_IRQ_SLAVE;
-  NVIC_Init(&NVIC_InitStructure);
-}
-
 static void spiConfigureWithSpeed(uint16_t baudRatePrescaler)
 {
   SPI_InitTypeDef  SPI_InitStructure;
@@ -329,25 +213,6 @@ static void spiConfigureWithSpeed(uint16_t baudRatePrescaler)
   SPI_InitStructure.SPI_CRCPolynomial = 0; // Not used
 
   SPI_InitStructure.SPI_BaudRatePrescaler = baudRatePrescaler;
-  SPI_Init(SPI, &SPI_InitStructure);
-}
-
-static void spiConfigureSlave()
-{
-  SPI_InitTypeDef  SPI_InitStructure;
-
-  SPI_I2S_DeInit(SPI);
-
-  SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
-  SPI_InitStructure.SPI_Mode = SPI_Mode_Slave;
-  SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
-  SPI_InitStructure.SPI_CPOL = SPI_CPOL_High; //SPI_CPOL_Low;
-  SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge; //SPI_CPHA_1Edge;
-  SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-  SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
-  SPI_InitStructure.SPI_CRCPolynomial = 0; // Not used
-
-  //SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BAUDRATE_2MHZ; // The slave clock does not need to be set.
   SPI_Init(SPI, &SPI_InitStructure);
 }
 
@@ -396,227 +261,13 @@ bool spiExchange(size_t length, const uint8_t * data_tx, uint8_t * data_rx)
   return result;
 }
 
-bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx, bool handshake, int timeout)
-{
-  // DMA already configured, just need to set memory addresses
-  SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
-  SPI_TX_DMA_STREAM_SLAVE->NDTR = length;
-
-  SPI_RX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_rx;
-  SPI_RX_DMA_STREAM_SLAVE->NDTR = length;
-
-  // Enable SPI DMA Interrupts
-  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-
-  // Clear DMA Flags
-  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF5|DMA_FLAG_DMEIF5|DMA_FLAG_TEIF5|DMA_FLAG_HTIF5|DMA_FLAG_TCIF5);
-  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF0|DMA_FLAG_DMEIF0|DMA_FLAG_TEIF0|DMA_FLAG_HTIF0|DMA_FLAG_TCIF0);
-
-  // Enable DMA Streams
-  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,ENABLE);
-  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,ENABLE);
-
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
-
-  // Enable peripheral
-  SPI_Cmd(SPI, ENABLE);
-
-  if(handshake){
-    digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
-  }
-
-  // Wait for completion
-  bool result = ((xSemaphoreTake(txCompleteSlave, ( TickType_t )timeout) == pdFALSE)
-             && (xSemaphoreTake(rxCompleteSlave, ( TickType_t )timeout) == pdFALSE));
-
-  if(handshake){
-    digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
-  }
-
-  // Disable peripheral
-  SPI_Cmd(SPI, DISABLE);
-  return result;
-}
-
-
-
-
-// first send, than wait for recive with timeout in ms
-bool spiSendThanReciveSlave(size_t length_tx, const uint8_t * data_tx, size_t length_rx, uint8_t * data_rx, uint32_t timeout)
-{
-  // DMA already configured, just need to set memory addresses
-  SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
-  SPI_TX_DMA_STREAM_SLAVE->NDTR = length_tx;
-  // DMA already configured, just need to set memory addresses
-  SPI_RX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_rx;
-  SPI_RX_DMA_STREAM_SLAVE->NDTR = length_rx;
-
-
-  // Enable SPI DMA Interrupts
-  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-  // Enable SPI DMA Interrupts
-  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-
-  // Clear DMA Flags
-  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF5|DMA_FLAG_DMEIF5|DMA_FLAG_TEIF5|DMA_FLAG_HTIF5|DMA_FLAG_TCIF5);
-  // Clear DMA Flags
-  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF0|DMA_FLAG_DMEIF0|DMA_FLAG_TEIF0|DMA_FLAG_HTIF0|DMA_FLAG_TCIF0);
-
-  // Enable DMA Streams
-  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,ENABLE);
-  // Enable DMA Streams
-  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,ENABLE);
-
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
-  
-  // Enable peripheral
-  SPI_Cmd(SPI, ENABLE);
-
-  digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
-  // Wait for completion
-  // TODO: bool result_tx = (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) == pdTRUE);
-  if (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) != pdTRUE){
-    return false;
-  }
-  digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
-
-
-
-
-  // TODO: Why is the semaphore sometimes already set at this point?
-  xSemaphoreTake(rxCompleteSlave, 0); // In case the semaphore is still set, we take it.
-
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
-  // Wait for rx completion
-  bool result_rx = false;
-  if (xSemaphoreTake(rxCompleteSlave, M2T(timeout)) == pdTRUE){
-    result_rx = true;
-  }
-
-
-
-  // Disable peripheral
-  SPI_Cmd(SPI, DISABLE);
-  return result_rx;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// timeout in ms
-bool spiReciveSlave(size_t length, uint8_t * data_rx, uint32_t timeout)
-{
-  // TODO: Why is the semaphore sometimes already set at this point?
-  xSemaphoreTake(rxCompleteSlave, 0); // In case the semaphore is still set, we take it.
-
-  // DMA already configured, just need to set memory addresses
-  SPI_RX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_rx;
-  SPI_RX_DMA_STREAM_SLAVE->NDTR = length;
-
-  // Enable SPI DMA Interrupts
-  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-
-  // Clear DMA Flags
-  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF0|DMA_FLAG_DMEIF0|DMA_FLAG_TEIF0|DMA_FLAG_HTIF0|DMA_FLAG_TCIF0);
-
-  // Enable DMA Streams
-  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,ENABLE);
-
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, ENABLE);
-
-  // Enable peripheral
-  SPI_Cmd(SPI, ENABLE);
-
-
-  // Wait for completion
-  //bool result = (xSemaphoreTake(rxCompleteSlave, (TickType_t) timeout) == pdTRUE);
-
-  bool result = false;
-  if (xSemaphoreTake(rxCompleteSlave, M2T(timeout)) == pdTRUE){
-    result = true;
-  }
-
-  //bool result = (xSemaphoreTake(rxCompleteSlave, (TickType_t) 1000) == pdTRUE);
-
-  // Disable peripheral
-  SPI_Cmd(SPI, DISABLE);
-  return result;
-}
-
-
-bool spiSendSlave(size_t length, const uint8_t * data_tx)
-{
-  // DMA already configured, just need to set memory addresses
-  SPI_TX_DMA_STREAM_SLAVE->M0AR = (uint32_t)data_tx;
-  SPI_TX_DMA_STREAM_SLAVE->NDTR = length;
-
-  // Enable SPI DMA Interrupts
-  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, ENABLE);
-
-  // Clear DMA Flags
-  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE, DMA_FLAG_FEIF5|DMA_FLAG_DMEIF5|DMA_FLAG_TEIF5|DMA_FLAG_HTIF5|DMA_FLAG_TCIF5);
-
-  // Enable DMA Streams
-  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,ENABLE);
-
-  // Enable SPI DMA requests
-  SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, ENABLE);
-
-  // Enable peripheral
-  SPI_Cmd(SPI, ENABLE);
-
-  digitalWrite(GPIO_HANDSHAKE, HIGH);  // Handshake HIGH (data for master available)
-
-  // Wait for completion
-  bool result = (xSemaphoreTake(txCompleteSlave, portMAX_DELAY) == pdTRUE);
-
-  digitalWrite(GPIO_HANDSHAKE, LOW);  // Handshake LOW (data transmitted)
-
-  // Disable peripheral
-  SPI_Cmd(SPI, DISABLE);
-  return result;
-}
-
-
-
-
-
-
-
 void spiBeginTransaction(uint16_t baudRatePrescaler)
 {
   xSemaphoreTake(spiMutex, portMAX_DELAY);
   spiConfigureWithSpeed(baudRatePrescaler);
 }
 
-void spiBeginTransactionSlave()
-{
-  xSemaphoreTake(spiMutex, portMAX_DELAY);
-  spiConfigureSlave();
-}
-
 void spiEndTransaction()
-{
-  xSemaphoreGive(spiMutex);
-}
-
-void spiEndTransactionSlave()
 {
   xSemaphoreGive(spiMutex);
 }
@@ -626,24 +277,20 @@ void __attribute__((used)) SPI_TX_DMA_IRQHandler(void)
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
 
   // Stop and cleanup DMA stream
-  //DMA_ITConfig(SPI_TX_DMA_STREAM, DMA_IT_TC, DISABLE);
-  DMA_ITConfig(SPI_TX_DMA_STREAM_SLAVE, DMA_IT_TC, DISABLE);
-  //DMA_ClearITPendingBit(SPI_TX_DMA_STREAM, SPI_TX_DMA_FLAG_TCIF);
-  DMA_ClearITPendingBit(SPI_TX_DMA_STREAM_SLAVE, SPI_TX_DMA_FLAG_TCIF_SLAVE);
+  DMA_ITConfig(SPI_TX_DMA_STREAM, DMA_IT_TC, DISABLE);
+  DMA_ClearITPendingBit(SPI_TX_DMA_STREAM, SPI_TX_DMA_FLAG_TCIF);
 
   // Clear stream flags
-  //DMA_ClearFlag(SPI_TX_DMA_STREAM,SPI_TX_DMA_FLAG_TCIF);
-  DMA_ClearFlag(SPI_TX_DMA_STREAM_SLAVE,SPI_TX_DMA_FLAG_TCIF_SLAVE);
+  DMA_ClearFlag(SPI_TX_DMA_STREAM,SPI_TX_DMA_FLAG_TCIF);
 
   // Disable SPI DMA requests
   SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Tx, DISABLE);
 
   // Disable streams
-  //DMA_Cmd(SPI_TX_DMA_STREAM,DISABLE);
-  DMA_Cmd(SPI_TX_DMA_STREAM_SLAVE,DISABLE);
+  DMA_Cmd(SPI_TX_DMA_STREAM,DISABLE);
 
   // Give the semaphore, allowing the SPI transaction to complete
-  xSemaphoreGiveFromISR(txCompleteSlave, &xHigherPriorityTaskWoken);
+  xSemaphoreGiveFromISR(txComplete, &xHigherPriorityTaskWoken);
 
   if (xHigherPriorityTaskWoken)
   {
@@ -656,24 +303,20 @@ void __attribute__((used)) SPI_RX_DMA_IRQHandler(void)
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
 
   // Stop and cleanup DMA stream
-  //DMA_ITConfig(SPI_RX_DMA_STREAM, DMA_IT_TC, DISABLE);
-  DMA_ITConfig(SPI_RX_DMA_STREAM_SLAVE, DMA_IT_TC, DISABLE);
-  //DMA_ClearITPendingBit(SPI_RX_DMA_STREAM, SPI_RX_DMA_FLAG_TCIF);
-  DMA_ClearITPendingBit(SPI_RX_DMA_STREAM_SLAVE, SPI_RX_DMA_FLAG_TCIF_SLAVE);
+  DMA_ITConfig(SPI_RX_DMA_STREAM, DMA_IT_TC, DISABLE);
+  DMA_ClearITPendingBit(SPI_RX_DMA_STREAM, SPI_RX_DMA_FLAG_TCIF);
 
   // Clear stream flags
-  //DMA_ClearFlag(SPI_RX_DMA_STREAM,SPI_RX_DMA_FLAG_TCIF);
-  DMA_ClearFlag(SPI_RX_DMA_STREAM_SLAVE,SPI_RX_DMA_FLAG_TCIF_SLAVE);
+  DMA_ClearFlag(SPI_RX_DMA_STREAM,SPI_RX_DMA_FLAG_TCIF);
 
   // Disable SPI DMA requests
   SPI_I2S_DMACmd(SPI, SPI_I2S_DMAReq_Rx, DISABLE);
 
   // Disable streams
-  //DMA_Cmd(SPI_RX_DMA_STREAM,DISABLE);
-  DMA_Cmd(SPI_RX_DMA_STREAM_SLAVE,DISABLE);
+  DMA_Cmd(SPI_RX_DMA_STREAM,DISABLE);
 
   // Give the semaphore, allowing the SPI transaction to complete
-  xSemaphoreGiveFromISR(rxCompleteSlave, &xHigherPriorityTaskWoken);
+  xSemaphoreGiveFromISR(rxComplete, &xHigherPriorityTaskWoken);
 
   if (xHigherPriorityTaskWoken)
   {
