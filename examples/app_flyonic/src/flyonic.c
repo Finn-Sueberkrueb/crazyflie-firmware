@@ -22,10 +22,7 @@
 #include "stabilizer.h"
 
 #include "app.h"
-
-
 #include "task.h"
-
 #include "deck.h"
 #include "deck_core.h"
 
@@ -36,46 +33,36 @@
 static SemaphoreHandle_t pickupActuatorPackage;
 static SemaphoreHandle_t spiFree;
 #define handshake_TASK_PRIORITY 2
-#define sendState_PERIOD_MS pdMS_TO_TICKS( 1000 )
+#define sendState_PERIOD_MS pdMS_TO_TICKS( 10 )
 static void vSendStateCallback( TimerHandle_t xTimer );
-
 
 // TODO: define Buffer size
 #define BUFFER_SIZE sizeof(t_externalState)
 #define EPS32_CS_PIN DECK_GPIO_IO4
 #define GPIO_HANDSHAKE DECK_GPIO_IO1
 
-
-
-//  #define EXTI_PortSource EXTI_PortSourceGPIOC
-//  #define EXTI_PinSource 	EXTI_PinSource11
-//  #define EXTI_LineN 		  EXTI_Line11
-
-
 static uint8_t spiTxBufferState[sizeof(t_externalState)];
 static uint8_t spiRxBufferState[sizeof(t_externalState)];
-static uint8_t spiTxBufferActor[sizeof(t_extrenalActuator)];
 static uint8_t spiRxBufferActor[sizeof(t_extrenalActuator)];
 
-
 // TODO: increase SPI speed
-static uint16_t spiSpeed = SPI_BAUDRATE_2MHZ; // SPI_BAUDRATE_21MHZ
+static uint16_t spiSpeed = SPI_BAUDRATE_6MHZ; // SPI_BAUDRATE_21MHZ
+//#define SPI_BAUDRATE_21MHZ  SPI_BaudRatePrescaler_4     // 21MHz
+//#define SPI_BAUDRATE_12MHZ  SPI_BaudRatePrescaler_8     // 11.5MHz
+//#define SPI_BAUDRATE_6MHZ   SPI_BaudRatePrescaler_16    // 5.25MHz
+//#define SPI_BAUDRATE_3MHZ   SPI_BaudRatePrescaler_32    // 2.625MHz
+//#define SPI_BAUDRATE_2MHZ   SPI_BaudRatePrescaler_64    // 1.3125MHz
 
-
-/* Interrupt service routine, call the interrupt callback */
+// Interrupt service routine, call the interrupt callback
 void __attribute__((used)) EXTI8_Callback(void)
 {
-
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
-
   xSemaphoreGiveFromISR(pickupActuatorPackage, &xHigherPriorityTaskWoken);
 
   if (xHigherPriorityTaskWoken)
   {
     portYIELD();
   }
-
-  
 }
 
 static void handshake_task(void* arg)
@@ -84,23 +71,11 @@ static void handshake_task(void* arg)
         if(xSemaphoreTake(pickupActuatorPackage, portMAX_DELAY) == pdTRUE) {
           xSemaphoreTake(spiFree, portMAX_DELAY);
 
-          //spiReciveMaster(sizeof(t_extrenalActuator), (uint8_t *)(&spiRxBufferActor));
           spiExchange(sizeof(t_extrenalActuator), (uint8_t *)(&spiRxBufferActor), (uint8_t *)(&spiRxBufferActor));
-
-
-          //spiExchange(sizeof(t_extrenalActuator), (uint8_t *)(&spiTxBufferActor), (uint8_t *)(&spiRxBufferActor));
 
           t_extrenalActuator *reciveActionPtr = (t_extrenalActuator *)((uint8_t*)&spiRxBufferActor);
 
-          //DEBUG_PRINT("time: %"PRId64"\n", reciveActionPtr->timestamp);
-          //DEBUG_PRINT("status: %d\n", reciveActionPtr->status);
-          DEBUG_PRINT("recived frame: %u\n", reciveActionPtr->frame);
-          //DEBUG_PRINT("motor1: %u\n", reciveActionPtr->motor_1);
-          //DEBUG_PRINT("motor2: %u\n", reciveActionPtr->motor_2);
-          //DEBUG_PRINT("motor3: %u\n", reciveActionPtr->motor_3);
-          //DEBUG_PRINT("motor4: %u\n", reciveActionPtr->motor_4);
-          
-          //uint64_t latency = usecTimestamp() - recive_action->timestamp;
+
           //lost frames = ???? recive_action->frame;
 
           uint64_t LastExternalLatency;
@@ -115,6 +90,15 @@ static void handshake_task(void* arg)
             LastExternalLatency = CalculateExternalLatency(reciveActionPtr->timestamp);
 
           }
+
+          //DEBUG_PRINT("time: %"PRId64"\n", reciveActionPtr->timestamp);
+          //DEBUG_PRINT("status: %d\n", reciveActionPtr->status);
+          //DEBUG_PRINT("recived frame: %u\n", reciveActionPtr->frame);
+          //DEBUG_PRINT("motor1: %u\n", reciveActionPtr->motor_1);
+          //DEBUG_PRINT("motor2: %u\n", reciveActionPtr->motor_2);
+          //DEBUG_PRINT("motor3: %u\n", reciveActionPtr->motor_3);
+          //DEBUG_PRINT("motor4: %u\n", reciveActionPtr->motor_4);
+          
 
           //DEBUG_PRINT("%.3f - %u - %u\n", LastExternalLatency/1000.0, reciveActionPtr->frame, sendStatePtr->frame);
           DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
@@ -159,25 +143,17 @@ static void vSendStateCallback( TimerHandle_t xTimer )
     xSemaphoreTake(spiFree, portMAX_DELAY);
     t_externalState *sendStatePtr = (t_externalState *)(((uint8_t*)&spiTxBufferState));
     getCrazyflieState(sendStatePtr);
-    //DEBUG_PRINT("done send to CF\n");
-    
 
 
-    //bool result = spiSendThanReciveSlave(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState), sizeof(t_extrenalActuator)+1, (uint8_t *)(&spiRxBufferActor), DT);
-
-
+    // TODO: delete
+    sendStatePtr->timestamp = usecTimestamp();
     
 
     //DEBUG_PRINT("spiTxBufferState 0-7: %d %d %d %d %d %d %d %d\n", spiTxBufferState[0], spiTxBufferState[1], spiTxBufferState[2], spiTxBufferState[3], spiTxBufferState[4], spiTxBufferState[5], spiTxBufferState[6], spiTxBufferState[7]);
-    //spiSendSlave(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState));
-    //bool spiReciveMaster(size_t length_rx, uint8_t * data_rx);
 
-
-    DEBUG_PRINT("send frame: %u\n", sendStatePtr->frame );
-    //spiSendMaster(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState));
+    //DEBUG_PRINT("send frame: %u\n", sendStatePtr->frame );
     spiExchange(sizeof(t_externalState), (uint8_t *)(&spiTxBufferState), (uint8_t *)(&spiTxBufferState));
     
-    DEBUG_PRINT("send\n");
     xSemaphoreGive(spiFree);
 
 }
@@ -195,7 +171,6 @@ void appInit() {
 
   memset(&spiTxBufferState, 0x06, sizeof(t_externalState));
   memset(&spiRxBufferState, 0x05, sizeof(t_externalState));
-  memset(&spiTxBufferActor, 0x02, sizeof(t_extrenalActuator));
   memset(&spiRxBufferActor, 0x03, sizeof(t_extrenalActuator));
   
 
