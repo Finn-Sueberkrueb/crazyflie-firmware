@@ -6,6 +6,7 @@
     },
     "files.associations": {
         "bootloader.h": "c",
-        "stabilizer.h": "c"
+        "stabilizer.h": "c",
+        "stabilizer_types.h": "c"
     }
 }
