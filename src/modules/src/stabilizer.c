@@ -43,6 +43,8 @@
 
 #include "stabilizer.h"
 
+#include "uart2.h"
+
 #include "sensors.h"
 #include "commander.h"
 #include "crtp_commander_high_level.h"
@@ -63,6 +65,11 @@
 static bool isInit;
 static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
+
+// for Flyonic external controll
+static uint8_t uartTxBufferState[sizeof(t_externalState)];
+#define FLYONIC_EVERY_N 3 // every n.th measurment is sent to remote (scaling from 1KHz)
+static int Flyonic_conter = 1;
 
 static uint32_t inToOutLatency;
 static uint32_t LastExternalLatency;
@@ -274,6 +281,20 @@ static void stabilizerTask(void* param)
 
     // update sensorData struct (for logging variables)
     sensorsAcquire(&sensorData, tick);
+
+    // get data for flyonic
+    if( Flyonic_conter == FLYONIC_EVERY_N){
+      t_externalState *sendStatePtr = (t_externalState *)(((uint8_t*)&uartTxBufferState));
+      getCrazyflieState(sendStatePtr);
+      uart2SendDataDmaBlocking(sizeof(t_externalState), (uint8_t *)(&uartTxBufferState));
+      Flyonic_conter = 1;
+    } else {
+      Flyonic_conter++;
+    }
+    
+
+
+
 
     if (healthShallWeRunTest()) {
       healthRunTests(&sensorData);
