@@ -63,12 +63,12 @@ typedef struct {
   float acc_y; // m/ss
   float acc_z; // m/ss
   float q_1;
-  //float q_2;
-  //float q_3;
-  //float q_4;
-  float rot_x; // deg
-  float rot_y; // deg
-  float rot_z; // deg
+  float q_2;
+  float q_3;
+  float q_4;
+  //float rot_x; // deg
+  //float rot_y; // deg
+  //float rot_z; // deg
   float rot_vel_x; // deg/s
   float rot_vel_y; // deg/s
   float rot_vel_z; // deg/s

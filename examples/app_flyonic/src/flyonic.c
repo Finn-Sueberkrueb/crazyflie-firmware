@@ -31,6 +31,7 @@
 #include "debug.h"
 #include <inttypes.h>
 
+//#define SEND_LOOP
 
 #if defined(SEND_LOOP)
 #define sendState_PERIOD_MS pdMS_TO_TICKS( 2 )

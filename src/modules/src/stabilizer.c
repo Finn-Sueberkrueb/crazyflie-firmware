@@ -283,6 +283,8 @@ static void stabilizerTask(void* param)
     sensorsAcquire(&sensorData, tick);
 
     // get data for flyonic
+    // TODO: This makes Problems with the estimator
+    
     if( Flyonic_conter == FLYONIC_EVERY_N){
       t_externalState *sendStatePtr = (t_externalState *)(((uint8_t*)&uartTxBufferState));
       getCrazyflieState(sendStatePtr);
@@ -417,12 +419,12 @@ void getCrazyflieState(t_externalState *returnState)
   returnState->acc_z = sensorData.acc.z;
 
   returnState->q_1 = state.attitudeQuaternion.w; // TODO
-  //returnState->q_2 = state.attitudeQuaternion.x;
-  //returnState->q_3 = state.attitudeQuaternion.y;
-  //returnState->q_4 = state.attitudeQuaternion.z;
-  returnState->rot_x = state.attitude.roll;
-  returnState->rot_y = state.attitude.pitch;
-  returnState->rot_z = state.attitude.yaw;
+  returnState->q_2 = state.attitudeQuaternion.x;
+  returnState->q_3 = state.attitudeQuaternion.y;
+  returnState->q_4 = state.attitudeQuaternion.z;
+  //returnState->rot_x = state.attitude.roll;
+  //returnState->rot_y = -state.attitude.pitch; // !!! ATENTION invertion !!!
+  //returnState->rot_z = state.attitude.yaw;
 
   returnState->rot_vel_x = sensorData.gyro.x;
   returnState->rot_vel_y = sensorData.gyro.y;
