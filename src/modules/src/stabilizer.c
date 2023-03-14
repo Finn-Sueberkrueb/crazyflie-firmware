@@ -441,6 +441,18 @@ void getCrazyflieState(t_externalState *returnState)
 
   returnState->lased_actuator_frame = LastActuatorFrame; //uint16_t
   returnState->latency = LastExternalLatency; //float
+
+  float supplyVoltage = pmGetBatteryVoltage();
+  float minVoltage = 2.0;
+  float maxVoltage = 5.0;
+
+  if( supplyVoltage < minVoltage ) {
+      returnState->battery = 0 ;
+  } else if( supplyVoltage > maxVoltage ) {
+      returnState->battery = UINT16_MAX ;
+  } else {
+      returnState->battery = (uint16_t)(((supplyVoltage - minVoltage) / maxVoltage) * (float)UINT16_MAX) ; 
+  }
 }
 
 

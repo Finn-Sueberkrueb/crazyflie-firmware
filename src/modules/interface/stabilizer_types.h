@@ -66,9 +66,6 @@ typedef struct {
   float q_2;
   float q_3;
   float q_4;
-  //float rot_x; // deg
-  //float rot_y; // deg
-  //float rot_z; // deg
   float rot_vel_x; // deg/s
   float rot_vel_y; // deg/s
   float rot_vel_z; // deg/s
@@ -82,9 +79,9 @@ typedef struct {
   uint16_t motor_4;
   uint16_t frame;
   uint16_t lased_actuator_frame;
+  uint16_t battery; // Battery level between 3.0 and 4.1 V in 
   uint8_t status;
-  //uint8_t empty1; // Padding
-  //uint16_t empty2; // Padding
+  uint8_t empty1; // Padding
   
 } t_externalState;
 
