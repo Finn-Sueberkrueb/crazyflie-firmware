@@ -43,7 +43,7 @@ bool systemIsArmed();
 void systemSetExternalControl(bool val);
 bool externalControlActive();
 // TODO: define extarnal controll timeout
-#define EXTERNAL_CONTROLL_TIMEOUT 80000 // if it drops below 20 Hz. number in usec. 1000 usec = 1ms (1000000usec = 1s)
+#define EXTERNAL_CONTROLL_TIMEOUT 50000 // if it drops below 20 Hz. number in usec. 1000 usec = 1ms (1000000usec = 1s)
 void systemRequestShutdown();
 void systemRequestNRFVersion();
 void systemSyslinkReceive();

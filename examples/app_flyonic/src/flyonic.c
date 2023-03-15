@@ -91,17 +91,17 @@ static void ReciveUARTActuator(void *arg)
       //uart2GetData(1, &crc);
       //ASSERT(crc == calcCrc(&uartRxp));
 
-      uint64_t LastExternalLatency;
+      //uint64_t LastExternalLatency;
       // TODO: accept only if timestamp is not older than 5ms
       if((reciveActionPtr->status == 1) && (reciveActionPtr->timestamp >= usecTimestamp() - 5000)) {
         // 1 = external controll active
         systemSetExternalControl(true);
         setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->frame);
-        LastExternalLatency = CalculateExternalLatency(reciveActionPtr->timestamp);
+        CalculateExternalLatency(reciveActionPtr->timestamp);
       } else {
         // external controll inactive
-        systemSetExternalControl(false);
-        LastExternalLatency = CalculateExternalLatency(reciveActionPtr->timestamp);
+        //systemSetExternalControl(false);
+        //CalculateExternalLatency(reciveActionPtr->timestamp);
 
       }
 
