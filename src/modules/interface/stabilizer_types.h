@@ -45,7 +45,7 @@ typedef struct {
   uint16_t motor_4;
   uint16_t frame;
   uint8_t status;
-  //uint8_t empty1; // Padding
+  uint8_t LRC; // LRC Checksum
 
 } t_extrenalActuator;
 
@@ -81,7 +81,7 @@ typedef struct {
   uint16_t lased_actuator_frame;
   uint16_t battery; // Battery level between 3.0 and 4.1 V in 
   uint8_t status;
-  uint8_t empty1; // Padding
+  uint8_t LRC; // LRC Checksum
   
 } t_externalState;
 

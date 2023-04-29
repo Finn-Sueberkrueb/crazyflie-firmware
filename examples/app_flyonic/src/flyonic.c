@@ -87,32 +87,43 @@ static void ReciveUARTActuator(void *arg)
 
       uart2GetData(sizeof(t_extrenalActuator), (uint8_t*)reciveActionPtr);
 
-      //uint8_t crc;
-      //uart2GetData(1, &crc);
-      //ASSERT(crc == calcCrc(&uartRxp));
+        // calculate LRC
+    	//char *send_data_ptr = (char *)&reciveActionPtr;
+        uint8_t LRC = 0;
+        for (uint16_t i = 0; i < (sizeof(t_extrenalActuator) - 1); i++) {
+            LRC ^= *((uint8_t *)reciveActionPtr + i);
+        }
 
-      //uint64_t LastExternalLatency;
-      // TODO: accept only if timestamp is not older than 5ms
-      if((reciveActionPtr->status == 1) && (reciveActionPtr->timestamp >= usecTimestamp() - 5000)) {
-        // 1 = external controll active
-        systemSetExternalControl(true);
-        setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->frame);
-        CalculateExternalLatency(reciveActionPtr->timestamp);
-      } else {
-        // external controll inactive
-        //systemSetExternalControl(false);
-        //CalculateExternalLatency(reciveActionPtr->timestamp);
+        //uint8_t crc;
+        //uart2GetData(1, &crc);
+        //ASSERT(crc == calcCrc(&uartRxp));
 
-      }
+        // only use data if LRC is correct
+        if (LRC == reciveActionPtr->LRC) {
 
-      //DEBUG_PRINT("time: %"PRId64"\n", reciveActionPtr->timestamp);
-      //DEBUG_PRINT("status: %d\n", reciveActionPtr->status);
-      //DEBUG_PRINT("recived frame: %u\n", reciveActionPtr->frame);
-      //DEBUG_PRINT("motor1: %u\n", reciveActionPtr->motor_1);
-      //DEBUG_PRINT("motor2: %u\n", reciveActionPtr->motor_2);
-      //DEBUG_PRINT("motor3: %u\n", reciveActionPtr->motor_3);
-      //DEBUG_PRINT("motor4: %u\n", reciveActionPtr->motor_4);
-      //DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
+            //uint64_t LastExternalLatency;
+            // TODO: accept only if timestamp is not older than 5ms
+            if((reciveActionPtr->status == 1) && (reciveActionPtr->timestamp >= usecTimestamp() - 5000)) {
+                // 1 = external controll active
+                systemSetExternalControl(true);
+                setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->frame);
+                CalculateExternalLatency(reciveActionPtr->timestamp);
+            } else {
+                // external controll inactive
+                //systemSetExternalControl(false);
+                //CalculateExternalLatency(reciveActionPtr->timestamp);
+
+            }
+
+            //DEBUG_PRINT("time: %"PRId64"\n", reciveActionPtr->timestamp);
+            //DEBUG_PRINT("status: %d\n", reciveActionPtr->status);
+            //DEBUG_PRINT("recived frame: %u\n", reciveActionPtr->frame);
+            //DEBUG_PRINT("motor1: %u\n", reciveActionPtr->motor_1);
+            //DEBUG_PRINT("motor2: %u\n", reciveActionPtr->motor_2);
+            //DEBUG_PRINT("motor3: %u\n", reciveActionPtr->motor_3);
+            //DEBUG_PRINT("motor4: %u\n", reciveActionPtr->motor_4);
+            //DEBUG_PRINT("%.3f\n", LastExternalLatency/1000.0);
+        }
     }
   }
 }

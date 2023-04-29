@@ -453,6 +453,14 @@ void getCrazyflieState(t_externalState *returnState)
   } else {
       returnState->battery = (uint16_t)(((supplyVoltage - minVoltage) / maxVoltage) * (float)UINT16_MAX) ; 
   }
+  
+  // calculate LRC
+  uint8_t LRC = 0;
+  for (uint16_t i = 0; i < (sizeof(t_externalState) - 1); i++) {
+    LRC ^= *((uint8_t *)(returnState) + i);
+  }
+    returnState->LRC = LRC;
+
 }
 
 
