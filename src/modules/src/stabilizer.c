@@ -412,9 +412,6 @@ void getFlyonicState(t_externalState *returnState)
   returnState->rot_vel_x = sensorData.gyro.x;
   returnState->rot_vel_y = sensorData.gyro.y;
   returnState->rot_vel_z = sensorData.gyro.z;
-  returnState->rot_acc_x = 0.0; //TODO: delete???
-  returnState->rot_acc_y = 0.0; //TODO: delete???
-  returnState->rot_acc_z = 0.0; //TODO: delete??? 
   
     if (flyonicControlActive()){
         returnState->motor_1 = motorThrustUncapped.motors.m1;

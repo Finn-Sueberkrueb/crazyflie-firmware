@@ -69,9 +69,9 @@ typedef struct {
   float rot_vel_x; // deg/s
   float rot_vel_y; // deg/s
   float rot_vel_z; // deg/s
-  float rot_acc_x; // deg/ss
-  float rot_acc_y; // deg/ss
-  float rot_acc_z; // deg/ss
+  float spare_1;
+  float spare_2;
+  float spare_3;
   float latency; //from sensor to actuator
   uint16_t motor_1;
   uint16_t motor_2;
