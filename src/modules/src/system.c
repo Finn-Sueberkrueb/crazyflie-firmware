@@ -85,8 +85,8 @@
 /* Private variable */
 static bool selftestPassed;
 static bool armed = ARM_INIT;
-static bool externalControl = false;
-static uint64_t externalControlLastTimestamp = 0;
+static bool flyonicControl = false;
+static uint64_t flyonicControlLastTimestamp = 0;
 static bool forceArm;
 static uint8_t dumpAssertInfo = 0;
 static bool isInit;
@@ -357,23 +357,27 @@ bool systemIsArmed()
 
 // system uses a External controll value.
 // Here also a safty shutdown could be included
-void systemSetExternalControl(bool val)
+void systemSetFlyonicControl(bool val)
 {
-  externalControlLastTimestamp = usecTimestamp();
-  externalControl = val;
+  flyonicControlLastTimestamp = usecTimestamp();
+  flyonicControl = val;
+  if (!val) {
+    motorsStop();
+  }
 }
 
-bool externalControlActive()
+bool flyonicControlActive()
 {
-  if (externalControl){
-    // if last update is not more than EXTERNAL_CONTROLL_TIMEOUT ago, return externalControlState
-    if ((externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) >= usecTimestamp())
+  if (flyonicControl){
+    // if last update is not more than FLYONIC_CONTROLL_TIMEOUT ago, return flyonicControlState
+    if ((flyonicControlLastTimestamp + FLYONIC_CONTROLL_TIMEOUT) >= usecTimestamp())
     {
-      //DEBUG_PRINT("remaining: %"PRId64"\n", (externalControlLastTimestamp + EXTERNAL_CONTROLL_TIMEOUT) - usecTimestamp());
+      //DEBUG_PRINT("remaining: %"PRId64"\n", (flyonicControlLastTimestamp + FLYONIC_CONTROLL_TIMEOUT) - usecTimestamp());
       return true;
     } else {
-      DEBUG_PRINT("No current external controll recived! \n");
-      externalControl = false;
+      DEBUG_PRINT("No current flyonic controll recived! \n");
+      flyonicControl = false;
+      motorsStop();
       return false;
     }
   } else {

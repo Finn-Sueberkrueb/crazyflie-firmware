@@ -30,9 +30,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-// TODO: FINN remove delay Libary for Latency here
-//#include "sleepus.h"
-
 #include "system.h"
 #include "log.h"
 #include "param.h"
@@ -87,7 +84,7 @@ static motors_thrust_uncapped_t motorThrustBatCompUncapped;
 static motors_thrust_pwm_t motorPwm;
 
 // For scratch storage - never logged or passed to other subsystems.
-static setpoint_t tempSetpoint;
+//static setpoint_t tempSetpoint;
 
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
@@ -140,8 +137,6 @@ static void calcSensorToOutputLatency(const sensorData_t *sensorData)
 {
   uint64_t outTimestamp = usecTimestamp();
   inToOutLatency = outTimestamp - sensorData->interruptTimestamp;
-  //TODO: FINN remove Latency print here
-  //DEBUG_PRINT("inToOutLatency (%lu)\n", inToOutLatency);
 }
 
 static void compressState()
@@ -170,7 +165,7 @@ static void compressState()
   stateCompressed.ratePitch = -sensorData.gyro.y * deg2millirad;
   stateCompressed.rateYaw = sensorData.gyro.z * deg2millirad;
 }
-
+/*
 static void compressSetpoint()
 {
   setpointCompressed.x = setpoint.position.x * 1000.0f;
@@ -185,7 +180,7 @@ static void compressSetpoint()
   setpointCompressed.ay = setpoint.acceleration.y * 1000.0f;
   setpointCompressed.az = setpoint.acceleration.z * 1000.0f;
 }
-
+*/
 void stabilizerInit(StateEstimatorType estimator)
 {
   if(isInit)
@@ -218,7 +213,7 @@ bool stabilizerTest(void)
 
   return pass;
 }
-
+/*
 static void checkEmergencyStopTimeout()
 {
   if (emergencyStopTimeout >= 0) {
@@ -229,7 +224,7 @@ static void checkEmergencyStopTimeout()
     }
   }
 }
-
+*/
 static void batteryCompensation(const motors_thrust_uncapped_t* motorThrustUncapped, motors_thrust_uncapped_t* motorThrustBatCompUncapped)
 {
   float supplyVoltage = pmGetBatteryVoltage();
@@ -287,13 +282,12 @@ static void stabilizerTask(void* param)
     
     if( Flyonic_conter == FLYONIC_EVERY_N){
       t_externalState *sendStatePtr = (t_externalState *)(((uint8_t*)&uartTxBufferState));
-      getCrazyflieState(sendStatePtr);
+      getFlyonicState(sendStatePtr);
       uart2SendDataDmaBlocking(sizeof(t_externalState), (uint8_t *)(&uartTxBufferState));
       Flyonic_conter = 1;
     } else {
       Flyonic_conter++;
-    }
-    
+    }    
 
 
 
@@ -307,13 +301,15 @@ static void stabilizerTask(void* param)
         estimatorType = stateEstimatorGetType();
       }
       // allow to update controller dynamically
+      /*
       if (controllerGetType() != controllerType) {
         controllerInit(controllerType);
         controllerType = controllerGetType();
       }
-
+        */
       stateEstimator(&state, tick);
       compressState();
+      /*
 
       if (crtpCommanderHighLevelGetSetpoint(&tempSetpoint, &state, tick)) {
         commanderSetSetpoint(&tempSetpoint, COMMANDER_PRIORITY_HIGHLEVEL);
@@ -333,18 +329,8 @@ static void stabilizerTask(void* param)
       // we are ok to fly, or if the Crazyflie is in flight.
       //
       supervisorUpdate(&sensorData);
-
-      if (externalControlActive() == false){
-        if (emergencyStop || (systemIsArmed() == false)) {
-          motorsStop();
-        } else {
-            // do not output PWM if external control is active
-            powerDistribution(&control, &motorThrustUncapped);
-            batteryCompensation(&motorThrustUncapped, &motorThrustBatCompUncapped);
-            powerDistributionCap(&motorThrustBatCompUncapped, &motorPwm);
-            setMotorRatios(&motorPwm); 
-        }
-      }
+      */
+      
 
 #ifdef CONFIG_DECK_USD
       // Log data to uSD card if configured
@@ -373,7 +359,7 @@ static void stabilizerTask(void* param)
 
 
 // Output PWM to motors if external control is active
-void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint32_t actuatorFrame)
+void setFlyonicMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t motor_3, uint16_t motor_4, uint32_t actuatorFrame)
 {
   motorThrustUncapped.motors.m1 = motor_1;
   motorThrustUncapped.motors.m2 = motor_2;
@@ -387,18 +373,18 @@ void setExternelMotorThrustUncapped(uint16_t motor_1, uint16_t motor_2, uint16_t
   LastActuatorFrame = actuatorFrame;
 }
 
-uint64_t CalculateExternalLatency(uint64_t sensorDataTimestamp){
+uint64_t CalculateFlyonicLatency(uint64_t sensorDataTimestamp){
   uint64_t outTimestamp = usecTimestamp();
   LastExternalLatency = outTimestamp - sensorDataTimestamp;
   return LastExternalLatency;
 }
 
 // collect all inforation for external state
-void getCrazyflieState(t_externalState *returnState)
+void getFlyonicState(t_externalState *returnState)
 {
   returnState->timestamp = sensorData.interruptTimestamp;
   
-  if (externalControlActive()){
+  if (flyonicControlActive()){
     returnState->status = 1;
   } else {
     returnState->status = 0;
@@ -418,42 +404,35 @@ void getCrazyflieState(t_externalState *returnState)
   returnState->acc_y = sensorData.acc.y;
   returnState->acc_z = sensorData.acc.z;
 
-  returnState->q_1 = state.attitudeQuaternion.w; // TODO
+  returnState->q_1 = state.attitudeQuaternion.w;
   returnState->q_2 = state.attitudeQuaternion.x;
   returnState->q_3 = state.attitudeQuaternion.y;
   returnState->q_4 = state.attitudeQuaternion.z;
-  //returnState->rot_x = state.attitude.roll;
-  //returnState->rot_y = -state.attitude.pitch; // !!! ATENTION invertion !!!
-  //returnState->rot_z = state.attitude.yaw;
 
   returnState->rot_vel_x = sensorData.gyro.x;
   returnState->rot_vel_y = sensorData.gyro.y;
   returnState->rot_vel_z = sensorData.gyro.z;
-
-  returnState->rot_acc_x = 0.0; //TODO: // float deg/ss
-  returnState->rot_acc_y = 0.0; //TODO: // float deg/ss 
-  returnState->rot_acc_z = 0.0; //TODO: // float deg/ss 
-
-  returnState->motor_1 = motorThrustUncapped.motors.m1;
-  returnState->motor_2 = motorThrustUncapped.motors.m2;
-  returnState->motor_3 = motorThrustUncapped.motors.m3;
-  returnState->motor_4 = motorThrustUncapped.motors.m4;
+  returnState->rot_acc_x = 0.0; //TODO: delete???
+  returnState->rot_acc_y = 0.0; //TODO: delete???
+  returnState->rot_acc_z = 0.0; //TODO: delete??? 
+  
+    if (flyonicControlActive()){
+        returnState->motor_1 = motorThrustUncapped.motors.m1;
+        returnState->motor_2 = motorThrustUncapped.motors.m2;
+        returnState->motor_3 = motorThrustUncapped.motors.m3;
+        returnState->motor_4 = motorThrustUncapped.motors.m4;
+    }else{
+        returnState->motor_1 = (uint16_t)(0);
+        returnState->motor_2 = (uint16_t)(0);
+        returnState->motor_3 = (uint16_t)(0);
+        returnState->motor_4 = (uint16_t)(0);
+    }
 
   returnState->lased_actuator_frame = LastActuatorFrame; //uint16_t
   returnState->latency = LastExternalLatency; //float
 
-  float supplyVoltage = pmGetBatteryVoltage();
-  float minVoltage = 2.0;
-  float maxVoltage = 5.0;
+  returnState->battery = (uint16_t)(pmGetBatteryVoltage() * 1000.0f);// in mV
 
-  if( supplyVoltage < minVoltage ) {
-      returnState->battery = 0 ;
-  } else if( supplyVoltage > maxVoltage ) {
-      returnState->battery = UINT16_MAX ;
-  } else {
-      returnState->battery = (uint16_t)(((supplyVoltage - minVoltage) / maxVoltage) * (float)UINT16_MAX) ; 
-  }
-  
   // calculate LRC
   uint8_t LRC = 0;
   for (uint16_t i = 0; i < (sizeof(t_externalState) - 1); i++) {

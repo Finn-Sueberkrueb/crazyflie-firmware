@@ -105,6 +105,4 @@
 #define EXTI9_5_PRI NVIC_LOW_PRI
 #define EXTI15_10_PRI NVIC_MID_PRI // this serves the decks and sensors
 
-// TODO: Finn add interrupt priority for handshake line
-
 #endif /* NVIC_CONF_H_ */

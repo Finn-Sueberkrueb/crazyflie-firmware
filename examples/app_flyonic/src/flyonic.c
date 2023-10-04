@@ -51,7 +51,7 @@ static void vSendStateCallback( TimerHandle_t xTimer )
   
     //memset(&uartTxBufferState, '+', 3);
     t_externalState *sendStatePtr = (t_externalState *)(((uint8_t*)&uartTxBufferState));
-    getCrazyflieState(sendStatePtr);
+    getFlyonicState(sendStatePtr);
 
     // TODO: delete
     sendStatePtr->timestamp = usecTimestamp();
@@ -105,13 +105,13 @@ static void ReciveUARTActuator(void *arg)
             // TODO: accept only if timestamp is not older than 5ms
             if((reciveActionPtr->status == 1) && (reciveActionPtr->timestamp >= usecTimestamp() - 5000)) {
                 // 1 = external controll active
-                systemSetExternalControl(true);
-                setExternelMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->frame);
-                CalculateExternalLatency(reciveActionPtr->timestamp);
+                systemSetFlyonicControl(true);
+                setFlyonicMotorThrustUncapped(reciveActionPtr->motor_1, reciveActionPtr->motor_2, reciveActionPtr->motor_3, reciveActionPtr->motor_4, reciveActionPtr->frame);
+                CalculateFlyonicLatency(reciveActionPtr->timestamp);
             } else {
                 // external controll inactive
-                //systemSetExternalControl(false);
-                //CalculateExternalLatency(reciveActionPtr->timestamp);
+                //systemSetFlyonicControl(false);
+                //CalculateFlyonicLatency(reciveActionPtr->timestamp);
 
             }
 

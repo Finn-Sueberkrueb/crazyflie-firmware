@@ -40,10 +40,10 @@ void systemStart();
 void systemWaitStart(void);
 void systemSetArmed(bool val);
 bool systemIsArmed();
-void systemSetExternalControl(bool val);
-bool externalControlActive();
+void systemSetFlyonicControl(bool val);
+bool flyonicControlActive();
 // TODO: define extarnal controll timeout
-#define EXTERNAL_CONTROLL_TIMEOUT 50000 // if it drops below 20 Hz. number in usec. 1000 usec = 1ms (1000000usec = 1s)
+#define FLYONIC_CONTROLL_TIMEOUT 50000 // if it drops below 20 Hz. number in usec. 1_000 usec = 1ms (1_000_000usec = 1s)
 void systemRequestShutdown();
 void systemRequestNRFVersion();
 void systemSyslinkReceive();
